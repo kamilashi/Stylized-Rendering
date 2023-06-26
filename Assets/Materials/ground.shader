@@ -7,6 +7,7 @@ Shader "Unlit/ground"
         _PlaneScale("Plane Scale",  Range(0.01, 50)) = 10.0
         _HeightModifier("Height Modifier",  Range(0.1, 10)) = 10.0
     }
+
     SubShader
     {
         Tags { "OutlineType" = "GroundShader" "RenderType"="Transparent" }

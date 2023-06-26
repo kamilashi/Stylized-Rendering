@@ -67,7 +67,7 @@ public class PostProPP : MonoBehaviour
 
     protected void CreateTexture(ref RenderTexture textureToMake, int divide = 1)
     {
-        textureToMake = new RenderTexture(texSize.x / divide, texSize.y / divide, 0);
+        textureToMake = new RenderTexture(texSize.x / divide, texSize.y / divide, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
         textureToMake.enableRandomWrite = true;
         textureToMake.Create();
     }

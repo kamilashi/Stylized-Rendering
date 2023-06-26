@@ -2,19 +2,6 @@ Shader "Unlit/outlineShader"
 {
 	Properties
 	{
-		//grass
-		_Color1("Color 1", Color) = (0.34, 0.72, 0.27, 1)
-		_Color2("Color 2", Color) = (0.49,0.63,0.07, 1)
-		_OutlineMapColor1("Outline Map Color 1", Color) = (0.34, 0.72, 0.27, 1)
-		_OutlineMapColor2("Outline Map Color 2", Color) = (0.49,0.63,0.07, 1)
-		_Fade("Fade", Range(0,5)) = 0.5
-		_HeightMap("Texture", 2D) = "black" {}
-		_MainTex("Main Text", 2D) = "black" {}
-
-		//ground
-		_Color("Color", Color) = (0.34, 0.72, 0.27, 1)
-		_PlaneScale("Plane Scale",  Range(0.01, 50)) = 10.0
-		_HeightModifier("Height Modifier",  Range(0.1, 10)) = 10.0
 	}
 		SubShader
 	{
@@ -26,7 +13,7 @@ Shader "Unlit/outlineShader"
 		Cull Off
 		// Outline Pass
 		CGPROGRAM
-		#pragma surface surf Standard vertex:vert //addshadow fullforwardshadows
+		#pragma surface surf Lambert vertex:vert //addshadow fullforwardshadows
 		#pragma instancing_options procedural:setup
 
 		sampler2D _MainTex;
@@ -103,16 +90,11 @@ Shader "Unlit/outlineShader"
 			#endif
 		}
 
-		void surf(Input IN, inout SurfaceOutputStandard o)
+		void surf(Input IN, inout SurfaceOutput o)
 		{
-			// Albedo comes from a texture tinted by color
-			//fixed4 c = tex2D (_MainTex, IN.uv_MainTex) * _Color * _Fade;
-		   // float height = tex2D(_HeightMap,(IN.uv)).x + 0.5;
-
 			o.Albedo = lerp(_OutlineMapColor1, _OutlineMapColor2, IN.texcoord.y);
-			// Metallic and smoothness come from slider variables
-			o.Metallic = 0;
-			o.Smoothness = 0;
+			//o.Metallic = 0;
+			//o.Smoothness = 0;
 		}
 		ENDCG
 	}
@@ -170,5 +152,52 @@ Shader "Unlit/outlineShader"
 			ENDCG
 		}
 	}
+
+		SubShader
+			{
+				Tags { "OutlineType" = "UnlitOutline" "RenderType" = "Opaque" }
+				LOD 100
+				Cull OFF
+
+				Pass
+				{
+					CGPROGRAM
+					#pragma vertex vert
+					#pragma fragment frag
+
+					#include "UnityCG.cginc"
+
+					struct appdata
+					{
+						float4 position : POSITION;
+						float2 uv : TEXCOORD0;
+					};
+
+					struct v2f
+					{
+						float4 position : SV_POSITION;
+						float2 uv : TEXCOORD0;
+					};
+
+					float4 _Color;
+
+					v2f vert(appdata v)
+					{
+						v2f o;
+						o.position = UnityObjectToClipPos(v.position);
+						o.uv = v.uv;
+						return o;
+					}
+
+					float4 frag(v2f i) : SV_Target
+					{
+						float4 col = _Color; //ground color for now
+						return col;
+					}
+					ENDCG
+				}
+			}
+
 FallBack "Diffuse"
+
 }

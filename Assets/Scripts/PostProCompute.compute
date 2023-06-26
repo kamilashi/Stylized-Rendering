@@ -1,11 +1,12 @@
-#pragma kernel OutlinePostPro
+#pragma kernel Outline
+#pragma kernel Combine
 
 shared Texture2D<float4> source;
 shared Texture2D<float4> outlineMap;
 RWTexture2D<float4> output;
 int2 screenResolution;
 float outlineThreshold;
-bool outlinesToggle;
+bool outlineMapView;
 
 bool withinScreen(uint2 id)
 {
@@ -23,18 +24,22 @@ bool withinScreen(uint2 id)
 }
 
 [numthreads(64, 16, 1)]
-void OutlinePostPro(uint3 id : SV_DispatchThreadID)
+void Outline(uint3 id : SV_DispatchThreadID)
 {
     float3 thisPixelColor = float3(outlineMap[id.xy].x, outlineMap[id.xy].y, outlineMap[id.xy].z);
     float4 thisPixel = outlineMap[id.xy];
-    if (length(thisPixelColor) == 0)
-    {
-        output[id.xy] = thisPixel;
-        return;
-    }
+    float4 thisPixelSource = source[id.xy];
+    float outline = 0;
     
-    if (outlinesToggle)
-    {
+    
+    
+    
+    if ((length(thisPixelColor) == 0) || (outlineMapView))
+        {
+            output[id.xy] = thisPixel;
+            return;
+        }
+    
         uint2 lowerPixelId = uint2(id.x, (id.y + 1));
         
         if (withinScreen(lowerPixelId))
@@ -44,7 +49,9 @@ void OutlinePostPro(uint3 id : SV_DispatchThreadID)
             if (abs(length(lowerPixelColor) - length(thisPixelColor)) > outlineThreshold)
                 {
                     thisPixel = float4(0, 0, 0, 1);
-                }
+                    outline = 1;
+
+            }
             }
         uint2 rightPixelId = uint2((id.x + 1), (id.y));
         if (withinScreen(rightPixelId))
@@ -54,8 +61,16 @@ void OutlinePostPro(uint3 id : SV_DispatchThreadID)
             if (abs(length(rightPixelColor) - length(thisPixelColor)) > outlineThreshold)
             {
                 thisPixel = float4(0, 0, 0, 1);
+                outline = 1;
             }
         }
-    }
-    output[id.xy] = thisPixel;
+    
+
+    
+    output[id.xy] = lerp(thisPixelSource, thisPixel, outline);
+}
+
+[numthreads(64, 16, 1)]
+void Combine(uint3 id : SV_DispatchThreadID)
+{
 }

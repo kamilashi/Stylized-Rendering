@@ -14,7 +14,6 @@
 			SubShader
 		{
 			Tags{
-				
 				"OutlineType" = "GrassShader"
 				"RenderType" = "Opaque" }
 
@@ -22,7 +21,7 @@
 			Cull Off
 			CGPROGRAM
 			// Physically based Standard lighting model, and enable shadows on all light types   
-			#pragma surface surf Standard vertex:vert //addshadow fullforwardshadows
+			#pragma surface surf Lambert vertex:vert //addshadow fullforwardshadows
 			#pragma instancing_options procedural:setup
 			 //#include "UnityCustomRenderTexture.cginc"
 
@@ -100,18 +99,12 @@
 				#endif
 			}
 
-			void surf(Input IN, inout SurfaceOutputStandard o)
+			void surf(Input IN, inout SurfaceOutput o)
 			{
-				// Albedo comes from a texture tinted by color
-				//fixed4 c = tex2D (_MainTex, IN.uv_MainTex) * _Color * _Fade;
-			   // float height = tex2D(_HeightMap,(IN.uv)).x + 0.5;
-
 				float4 landscapeGradient = lerp(_Color1, _Color2, IN.height);
-				//o.Albedo = lerp(landscapeGradient, _TipHightlightColor, IN.texcoord.y);
 				o.Albedo = landscapeGradient;
-				// Metallic and smoothness come from slider variables
-				o.Metallic = _Metallic;
-				o.Smoothness = _Glossiness;
+				//o.Metallic = _Metallic;
+				//o.Smoothness = _Glossiness;
 			}
 			ENDCG
 

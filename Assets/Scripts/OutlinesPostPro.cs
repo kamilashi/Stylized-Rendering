@@ -5,35 +5,32 @@ using UnityEngine;
 [ExecuteInEditMode]
 public class OutlinesPostPro : PostProPP
 {
-    public bool outlinesToggle;
-    [Range(0.001f, 0.1f)]
+    public bool outlineMapView;
+    [Range(0.001f, 0.7f)]
     public float outlineThreshold = 0.1f;
     public Camera outlineCameraDuplicate;
-    //public GameObject outlineCameraObj;
     public Shader outlineShader;
 
     public bool readyForPostPro;
 
     public RenderTexture outlineMap;
-    private int kernelOutlineId;
+    private int kernelOutline;
+    private int kernelCombine;
 
     protected override void Init()
     {
-        kernelName = "OutlinePostPro";
+        kernelName = "Outline";
         base.Init();
-        kernelOutlineId = shader.FindKernel(kernelName);
+        kernelOutline = shader.FindKernel(kernelName);
         outlineCameraDuplicate.enabled = false;
         outlineCameraDuplicate.SetReplacementShader(outlineShader, "OutlineType");
-        outlineCameraDuplicate.targetTexture = outlineMap;
-        //outlineCameraDuplicate.enabled = true;
-        //outlineCameraObj.GetComponent<OutlineCamera>().textToBlitTo = outlineMap;
     }
 
     protected override void CreateTextures()
     {
         base.CreateTextures();
         CreateTexture(ref outlineMap);
-        shader.SetTexture(kernelOutlineId, "outlineMap", outlineMap);
+        shader.SetTexture(kernelOutline, "outlineMap", outlineMap);
     }
 
     private void OnValidate()
@@ -46,7 +43,7 @@ public class OutlinesPostPro : PostProPP
 
     protected void SetProperties()
     {
-        shader.SetBool("outlinesToggle", outlinesToggle);
+        shader.SetBool("outlineMapView", outlineMapView);
         shader.SetFloat("outlineThreshold", outlineThreshold);
     }
 
@@ -54,11 +51,13 @@ public class OutlinesPostPro : PostProPP
     {
         if ((!init) || (!readyForPostPro)) return;
         Graphics.Blit(source, renderedSource);
-        //outlineMap = outlineCameraObj.GetComponent<OutlineCamera>().textToBlitTo;
+
         outlineCameraDuplicate.targetTexture = outlineMap;
         outlineCameraDuplicate.RenderWithShader(outlineShader, "OutlineType");
         outlineMap = outlineCameraDuplicate.activeTexture;
-        shader.Dispatch(kernelPostPro, groupSize.x, groupSize.y, 1);
+
+        shader.Dispatch(kernelOutline, groupSize.x, groupSize.y, 1);
+        shader.Dispatch(kernelCombine, groupSize.x, groupSize.y, 1);
         Graphics.Blit(output, destination);
     }
 
