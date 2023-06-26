@@ -1,0 +1,70 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#define THREADGROUPSIZE 128 
+#pragma kernel GenerateHeight
+#pragma kernel InitializeGrass
+
+shared RWTexture2D<float4> GeneratedNoiseMap;
+shared RWTexture2D<float4> Debug;
+int texResolution;
+float planeSideSize;
+float planeScale;
+float2 planeCenter;
+float heightModifier;
+
+struct GrassBlade
+{
+    float3 position;
+    float bend;
+    float noise;
+    float fade;
+    float tallness;
+};
+RWStructuredBuffer<GrassBlade> bladesBuffer;
+float time;
+float maxBend;
+float4 wind;
+
+#include "Noises.cginc"
+float random(float value, float seed = 0.546)
+{
+    float random = (frac(sin(value + seed) * 143758.5453)); // + 1.0)/2.0;
+    return random;
+}
+
+float2 random2(float value)
+{
+    return float2(
+		random(value, 3.9812),
+		random(value, 7.1536)
+	);
+}
+
+[numthreads(32,32,1)]
+void GenerateHeight (uint3 id : SV_DispatchThreadID)
+{
+    float2 uv = float2((float) id.x / (float) texResolution, (float) id.y / (float) texResolution);
+    float heightMap = SimpleNoise(uv - float2(0.5, 0), planeScale);
+    GeneratedNoiseMap[id.xy] = float4(heightMap.xxx, 1);
+    Debug[id.xy] = float4(heightMap.xxx, 1);
+}
+
+[numthreads(THREADGROUPSIZE, 1, 1)]
+void InitializeGrass(uint3 id : SV_DispatchThreadID)
+{
+    GrassBlade blade = bladesBuffer[id.x];
+    float mapX = ((-blade.position.x + (planeSideSize * planeScale) / 2.0f - planeCenter.x) / (float) (planeSideSize * planeScale));
+    float mapY = ((-blade.position.z + (planeSideSize * planeScale) / 2.0f - planeCenter.y) / (float) (planeSideSize * planeScale));
+    int2 coords = int2(round(mapX * texResolution), round(mapY * texResolution));
+    //float2 uvs = float2(mapX, mapY);
+
+    float height = GeneratedNoiseMap[coords];
+    blade.position.y = height;
+    float2 offset = (blade.position.xz + wind.xy * time * wind.z) * wind.w;
+    float noise = GeneratedNoiseMap[coords + random2(blade.position.x)];
+    blade.bend = noise * maxBend * blade.noise; //TO-DO: rename!
+    blade.noise = noise;
+    blade.tallness = height * noise * 5;
+    
+    Debug[coords] = float4(1, 0, 0, 1);
+    bladesBuffer[id.x] = blade;
+}

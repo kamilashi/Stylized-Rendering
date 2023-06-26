@@ -1,0 +1,61 @@
+#pragma kernel OutlinePostPro
+
+shared Texture2D<float4> source;
+shared Texture2D<float4> outlineMap;
+RWTexture2D<float4> output;
+int2 screenResolution;
+float outlineThreshold;
+bool outlinesToggle;
+
+bool withinScreen(uint2 id)
+{
+    if ((id.x < 0) ||
+        (id.x >= screenResolution.x))
+    {
+        return false;
+    }
+    if ((id.y < 0) ||
+        (id.y >= screenResolution.y))
+    {
+        return false;
+    }
+    return true;
+}
+
+[numthreads(64, 16, 1)]
+void OutlinePostPro(uint3 id : SV_DispatchThreadID)
+{
+    float3 thisPixelColor = float3(outlineMap[id.xy].x, outlineMap[id.xy].y, outlineMap[id.xy].z);
+    float4 thisPixel = outlineMap[id.xy];
+    if (length(thisPixelColor) == 0)
+    {
+        output[id.xy] = thisPixel;
+        return;
+    }
+    
+    if (outlinesToggle)
+    {
+        uint2 lowerPixelId = uint2(id.x, (id.y + 1));
+        
+        if (withinScreen(lowerPixelId))
+            {
+            float3 lowerPixelColor = float3(outlineMap[lowerPixelId].x, outlineMap[lowerPixelId].y, outlineMap[lowerPixelId].z);
+            float4 lowerPixel = outlineMap[lowerPixelId];
+            if (abs(length(lowerPixelColor) - length(thisPixelColor)) > outlineThreshold)
+                {
+                    thisPixel = float4(0, 0, 0, 1);
+                }
+            }
+        uint2 rightPixelId = uint2((id.x + 1), (id.y));
+        if (withinScreen(rightPixelId))
+        {
+            float3 rightPixelColor = float3(outlineMap[rightPixelId].x, outlineMap[rightPixelId].y, outlineMap[rightPixelId].z);
+            float4 rightPixel = outlineMap[rightPixelId];
+            if (abs(length(rightPixelColor) - length(thisPixelColor)) > outlineThreshold)
+            {
+                thisPixel = float4(0, 0, 0, 1);
+            }
+        }
+    }
+    output[id.xy] = thisPixel;
+}
