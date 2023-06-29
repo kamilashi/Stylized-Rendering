@@ -276,9 +276,7 @@ public class PlaneGrass : MonoBehaviour
         shader.SetFloat("heightModifier", heightModifier);
         shader.Dispatch(kernelHandleGrass, groupSize, 1, 1);
         groundMaterial.SetFloat("_HeightModifier", heightModifier);
-
         //Graphics.DrawMeshInstancedIndirect(blade, 0, grassMaterial, grass_bounds, argsBuffer);
-        //Graphics.RenderMeshInstanced(rp, blade,0, instData,10);
         Graphics.DrawMeshInstancedProcedural(blade, 0, grassMaterial, grass_bounds, bladesBuffer.count);
         
     }

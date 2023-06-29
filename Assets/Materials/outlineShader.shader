@@ -8,13 +8,13 @@ Shader "Unlit/outlineShader"
 		Tags{
 			"OutlineType" = "GrassShader"
 			"RenderType" = "Opaque" }
-
 		LOD 200
 		Cull Off
-		// Outline Pass
 		CGPROGRAM
 		#pragma surface surf Lambert vertex:vert //addshadow fullforwardshadows
 		#pragma instancing_options procedural:setup
+
+		
 
 		sampler2D _MainTex;
 		float4 _MainTex_ST;
@@ -28,15 +28,17 @@ Shader "Unlit/outlineShader"
 			float height;
 		};
 
-		float4 _Color1;
-		float4 _Color2;
-		float4 _OutlineMapColor1;
-		float4 _OutlineMapColor2;
+		//float4 _Color1;
+		//float4 _Color2;
 		float _Tallness;
 		float _Scale;
 		float _Fade;
 		float4x4 _Matrix;
 		float3 _Position;
+
+		float4 _OutlineMapColor1;
+		float4 _OutlineMapColor2;
+		float _OutlineGradientSlider;
 
 		float4x4 create_matrix(float3 pos, float theta) {
 			float c = cos(theta);
@@ -85,16 +87,13 @@ Shader "Unlit/outlineShader"
 				_Matrix = create_matrix(blade.position, blade.lean);
 				_Position = blade.position;
 				//_Fade = blade.fade;
-				//_Fade = 0.0f;
 				_Tallness = blade.tallness;// *float4 (0.34, 0.72, 0.27, 1);
 			#endif
 		}
 
 		void surf(Input IN, inout SurfaceOutput o)
 		{
-			o.Albedo = lerp(_OutlineMapColor1, _OutlineMapColor2, IN.texcoord.y);
-			//o.Metallic = 0;
-			//o.Smoothness = 0;
+			o.Albedo = lerp(_OutlineMapColor1, _OutlineMapColor2, (IN.texcoord.y - _OutlineGradientSlider));
 		}
 		ENDCG
 	}
@@ -125,11 +124,13 @@ Shader "Unlit/outlineShader"
 				float4 position : SV_POSITION;
 			};
 
+			//float4 _Color;
+
 			sampler2D _HeightMap;
 			float4 _HeightMap_ST;
-			float4 _Color;
 			float _PlaneScale;
 			float _HeightModifier;
+			float4 _OutlineMapColor;
 
 			v2f vert(appdata v)
 			{
@@ -145,7 +146,7 @@ Shader "Unlit/outlineShader"
 			{
 				// sample the texture
 				//fixed4 col = tex2D(_HeightMap, i.uv);
-				float4 col = _Color;//ground color for now
+				float4 col = _OutlineMapColor;//ground color for now
 
 				return col;
 			}
@@ -179,7 +180,8 @@ Shader "Unlit/outlineShader"
 						float2 uv : TEXCOORD0;
 					};
 
-					float4 _Color;
+					//float4 _Color;
+					float4 _OutlineMapColor;
 
 					v2f vert(appdata v)
 					{
@@ -191,13 +193,61 @@ Shader "Unlit/outlineShader"
 
 					float4 frag(v2f i) : SV_Target
 					{
-						float4 col = _Color; //ground color for now
+						float4 col = _OutlineMapColor; 
 						return col;
 					}
 					ENDCG
 				}
 			}
 
+
+			SubShader
+					{
+						Tags { "Queue" = "Transparent" "RenderType" = "Transparent"  "OutlineType" = "Foliage" }
+						LOD 100
+						ZWrite Off
+						Blend SrcAlpha OneMinusSrcAlpha
+
+						CGPROGRAM
+
+						#pragma surface surf Lambert alpha:fade
+						#include "../Scripts/Noises.cginc"
+						#include "../Scripts/HelperFunctions.cginc"
+						#include "UnityCG.cginc"
+
+						struct Input {
+								float4 vertex : SV_POSITION;
+								float4 color : COLOR;
+								float2 uv_MainTex;
+						};
+
+						float4 _OutlineMapColor1;
+						//float4 _OutlineMapColor0;
+						//float _OutlineMapDepthThreshold;
+						float _DistortionSpeed;
+						float _TransparencyRamp;
+
+						void surf(Input IN, inout SurfaceOutput o) {
+							
+
+							float4 clipSpacePos = UnityObjectToClipPos(IN.vertex);
+							//float4 worldSpacePos = mul(unity_ObjectToWorld, IN.vertex);
+
+							float xOffset = sin(_Time * _DistortionSpeed);
+							IN.vertex.x += xOffset;
+
+							float randomSeed = clipSpacePos.x * clipSpacePos.y;
+							float perlinMask = GradientNoise(IN.uv_MainTex + clipSpacePos.xy, 5);
+							float alphaMask = radialAlpha(IN.uv_MainTex);
+							alphaMask += perlinMask;
+							alphaMask = saturate(alphaMask);
+
+							 o.Albedo = _OutlineMapColor1.xyz;
+							 o.Alpha = step(_TransparencyRamp, alphaMask);
+						}
+
+						ENDCG
+					}
 FallBack "Diffuse"
 
 }

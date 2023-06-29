@@ -6,6 +6,9 @@ Shader "Unlit/ground"
         _Color("Color", Color) = (0.34, 0.72, 0.27, 1)
         _PlaneScale("Plane Scale",  Range(0.01, 50)) = 10.0
         _HeightModifier("Height Modifier",  Range(0.1, 10)) = 10.0
+
+
+        _OutlineMapColor("Outline Map Color", Color) = (0.34, 0.72, 0.27, 1)
     }
 
     SubShader

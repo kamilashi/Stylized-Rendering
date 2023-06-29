@@ -2,8 +2,8 @@ Shader "Unlit/unlit"
 {
     Properties
     {
-
         _Color("Color", Color) = (0.34, 0.72, 0.27, 1)
+        _OutlineMapColor("Outline Map Color", Color) = (0.34, 0.72, 0.27, 1)
     }
     SubShader
     {
@@ -31,6 +31,7 @@ Shader "Unlit/unlit"
             };
 
             float4 _Color;
+            //float4 _OutlineMapColor;
 
             v2f vert (appdata v)
             {

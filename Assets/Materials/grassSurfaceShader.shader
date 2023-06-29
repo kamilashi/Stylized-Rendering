@@ -4,11 +4,11 @@
 	{
 		_Color1("Color 1", Color) = (0.34, 0.72, 0.27, 1)
 		_Color2("Color 2", Color) = (0.49,0.63,0.07, 1)
-		_OutlineMapColor1("Outline Map Color 1", Color) = (0.34, 0.72, 0.27, 1)
-		_OutlineMapColor2("Outline Map Color 2", Color) = (0.49,0.63,0.07, 1)
-		_Fade("Fade", Range(0,5)) = 0.5
 		_HeightMap("Texture", 2D) = "black" {}
 		_MainTex("Main Text", 2D) = "black" {}
+		_OutlineMapColor2("Outline Map Color Top", Color) = (0.49,0.63,0.07, 1)
+		_OutlineMapColor1("Outline Map Color Bottom", Color) = (0.34, 0.72, 0.27, 1)
+		_OutlineGradientSlider("OutlineMap Gadient Slider", Range(-1,1)) = 0.0
 	}
 		//regular pass
 			SubShader
@@ -46,6 +46,7 @@
 			float _Fade;
 			float4x4 _Matrix;
 			float3 _Position;
+			float _OutlineGradientSlider;
 
 			float4x4 create_matrix(float3 pos, float theta) {
 				float c = cos(theta);
@@ -103,6 +104,7 @@
 			{
 				float4 landscapeGradient = lerp(_Color1, _Color2, IN.height);
 				o.Albedo = landscapeGradient;
+				//o.Albedo = float3(IN.texcoord, 0);
 				//o.Metallic = _Metallic;
 				//o.Smoothness = _Glossiness;
 			}
