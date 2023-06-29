@@ -83,7 +83,7 @@ Material:
     - _Color0: {r: 0.47071913, g: 0.8113208, b: 0.5694653, a: 1}
     - _Color1: {r: 0.4285333, g: 0.8490566, b: 0.4285333, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _OutlineMapColor1: {r: 1, g: 1, b: 1, a: 1}
+    - _OutlineMapColor1: {r: 0.9725491, g: 0.96470594, b: 0.96470594, a: 1}
     - _OutlineMapColorClose: {r: 0.33999997, g: 0.72, b: 0.26999995, a: 1}
     - _OutlineMapColorFar: {r: 0.7169812, g: 0.4836241, b: 0.68196744, a: 1}
   m_BuildTextureStacks: []
