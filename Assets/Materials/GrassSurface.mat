@@ -86,6 +86,6 @@ Material:
     - _Color2: {r: 0.54618424, g: 0.9811321, b: 0.32858673, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _OutlineMapColor1: {r: 1, g: 1, b: 1, a: 1}
-    - _OutlineMapColor2: {r: 0.754717, g: 0.53755784, b: 0.53755784, a: 1}
+    - _OutlineMapColor2: {r: 1, g: 0.8820755, b: 0.8820755, a: 1}
     - _TipHightlightColor: {r: 0.5660378, g: 0.5313279, b: 0.5313279, a: 1}
   m_BuildTextureStacks: []

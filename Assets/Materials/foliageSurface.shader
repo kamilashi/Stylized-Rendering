@@ -5,7 +5,8 @@ Shader "Unlit/foliageSurface"
         _MainTex ("Texture", 2D) = "white" {}
         _Color1("Color 1", Color) = (0.34, 0.72, 0.27, 1)
         //_Color0("Color 0", Color) = (0.34, 0.72, 0.27, 1)
-        _DistortionSpeed("Distortion Speed", Float) = 1
+        _SwingFreq("Swinging Speed",  Range(0.0, 30)) = 1
+        _SwingAmp("Swinging Amplitude",  Range(0.0, 20)) = 1
         [Toggle(USE_TEXTURE)] _UseTexture("Use Texture", Float) = 0
 
 
@@ -23,7 +24,7 @@ Shader "Unlit/foliageSurface"
         Blend SrcAlpha OneMinusSrcAlpha
         CGPROGRAM
 
-        #pragma surface surf Lambert alpha:fade
+        #pragma surface surf Lambert vertex:vert alpha:fade
         #include "foliage.cginc"
 
 

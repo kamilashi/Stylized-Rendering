@@ -212,43 +212,9 @@ Shader "Unlit/outlineShader"
 
 						CGPROGRAM
 
-						#pragma surface surf Lambert alpha:fade
+						#pragma surface surf Lambert vertex:vert alpha:fade 
 						#define OUTLINEPASS
 						#include "foliage.cginc"
-						//#include "../Scripts/Noises.cginc"
-						//#include "../Scripts/HelperFunctions.cginc"
-						//#include "UnityCG.cginc"
-
-						//struct Input {
-						//		float4 vertex : SV_POSITION;
-						//		float4 color : COLOR;
-						//		float2 uv_MainTex;
-						//};
-
-						//float4 _OutlineMapColor1;
-						////float4 _OutlineMapColor0;
-						////float _OutlineMapDepthThreshold;
-						//float _DistortionSpeed;
-						//float _TransparencyRamp;
-
-						//void surf(Input IN, inout SurfaceOutput o) {
-						//	
-
-						//	float4 clipSpacePos = UnityObjectToClipPos(IN.vertex);
-						//	//float4 worldSpacePos = mul(unity_ObjectToWorld, IN.vertex);
-
-						//	float xOffset = sin(_Time * _DistortionSpeed);
-						//	IN.vertex.x += xOffset;
-
-						//	float randomSeed = clipSpacePos.x * clipSpacePos.y;
-						//	float perlinMask = GradientNoise(IN.uv_MainTex + clipSpacePos.xy, 5);
-						//	float alphaMask = radialAlpha(IN.uv_MainTex);
-						//	alphaMask += perlinMask;
-						//	alphaMask = saturate(alphaMask);
-
-						//	 o.Albedo = _OutlineMapColor1.xyz;
-						//	 o.Alpha = step(_TransparencyRamp, alphaMask);
-						//}
 
 						ENDCG
 					}
