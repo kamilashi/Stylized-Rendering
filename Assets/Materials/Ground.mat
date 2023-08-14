@@ -85,7 +85,7 @@ Material:
     - _UVSec: 0
     - _ZWrite: 1
     m_Colors:
-    - _Color: {r: 0.50863296, g: 0.8490566, b: 0.68335277, a: 1}
+    - _Color: {r: 0.50356, g: 0.8679245, b: 0.5649266, a: 1}
     - _ColorOutlineMap: {r: 0.26898205, g: 0.7830189, b: 0.1735938, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _OutlineMapColor: {r: 0.8867924, g: 0.8867924, b: 0.8867924, a: 1}
