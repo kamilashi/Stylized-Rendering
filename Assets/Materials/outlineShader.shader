@@ -1,6 +1,5 @@
 Shader "Unlit/outlineShader"
 {
-//#define OUTLINEPASS
 
 	Properties
 	{
@@ -158,7 +157,7 @@ Shader "Unlit/outlineShader"
 
 		SubShader
 			{
-				Tags { "OutlineType" = "UnlitOutline" "RenderType" = "Opaque" }
+				Tags { "OutlineType" = "SilhouetteOutline" "RenderType" = "Opaque" }
 				LOD 100
 				Cull OFF
 
@@ -182,7 +181,6 @@ Shader "Unlit/outlineShader"
 						float2 uv : TEXCOORD0;
 					};
 
-					//float4 _Color;
 					float4 _OutlineMapColor;
 
 					v2f vert(appdata v)

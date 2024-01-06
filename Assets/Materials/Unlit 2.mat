@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Unlit 1
+  m_Name: Unlit 2
   m_Shader: {fileID: 4800000, guid: b39740914961697448f9c581c54aa224, type: 3}
   m_ValidKeywords: []
   m_InvalidKeywords: []
@@ -75,9 +75,9 @@ Material:
     - _UVSec: 0
     - _ZWrite: 1
     m_Colors:
-    - _Color: {r: 0.8588236, g: 0.9333334, b: 0.7372549, a: 1}
+    - _Color: {r: 0.9433962, g: 0.6220628, b: 0.12014952, a: 1}
     - _ColorOutlineMap: {r: 0.54318607, g: 0.8207547, b: 0.49167854, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _OutlineMapColor: {r: 0.4056604, g: 0.21239765, b: 0.21239765, a: 1}
+    - _OutlineMapColor: {r: 0.754717, g: 0.49483803, b: 0.49483803, a: 1}
     - _ShadowColor: {r: 0, g: 0, b: 0, a: 1}
   m_BuildTextureStacks: []

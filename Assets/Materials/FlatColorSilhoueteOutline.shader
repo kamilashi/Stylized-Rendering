@@ -1,13 +1,13 @@
-Shader "Unlit/unlit"
+Shader "Unlit/FlatColortWithSilhouetteOutline"
 {
     Properties
     {
-        _Color("Color", Color) = (0.34, 0.72, 0.27, 1)
+        _Color("Main Color", Color) = (0.34, 0.72, 0.27, 1)
         _OutlineMapColor("Outline Map Color", Color) = (0.34, 0.72, 0.27, 1)
     }
     SubShader
     {
-        Tags { "OutlineType" = "UnlitOutline"  "RenderType" = "Opaque" }
+        Tags { "OutlineType" = "SilhouetteOutline"  "RenderType" = "Opaque" }
         LOD 100
 
         Pass
@@ -17,6 +17,7 @@ Shader "Unlit/unlit"
             #pragma fragment frag
 
             #include "UnityCG.cginc"
+            #include "UnityLightingCommon.cginc" // for _LightColor0
 
             struct appdata
             {
