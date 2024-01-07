@@ -65,6 +65,7 @@ Material:
     - _GlossMapScale: 1
     - _Glossiness: 0.5
     - _GlossyReflections: 1
+    - _HasGlobalShadow: 1
     - _Metallic: 0
     - _Mode: 0
     - _OcclusionStrength: 1
@@ -75,9 +76,9 @@ Material:
     - _UVSec: 0
     - _ZWrite: 1
     m_Colors:
-    - _Color: {r: 0, g: 0, b: 0, a: 1}
+    - _Color: {r: 0.18276076, g: 0.18322445, b: 0.3490566, a: 1}
     - _ColorOutlineMap: {r: 0.54318607, g: 0.8207547, b: 0.49167854, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _OutlineMapColor: {r: 0.9716981, g: 0.9671146, b: 0.9671146, a: 1}
-    - _ShadowColor: {r: 0, g: 0, b: 0, a: 1}
+    - _OutlineMapColor: {r: 1, g: 0.07075471, b: 0.07075471, a: 1}
+    - _ShadowColor: {r: 0.059362777, g: 0.14373212, b: 0.4339623, a: 1}
   m_BuildTextureStacks: []
