@@ -3,15 +3,27 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [ExecuteInEditMode]
-public class OutlinesPostPro : PostProPP
+[RequireComponent(typeof(Camera))]
+public class OutlinesPostPro : MonoBehaviour
 {
+    // from parent class:
+    public ComputeShader shader = null;
     public bool readyForPostPro;
+
+    private Vector2Int texSize = new Vector2Int(0, 0);
+    [SerializeField]
+    private Vector2Int groupSize = new Vector2Int();
+    private bool init;
+    private Camera thisCamera;
+
+    // render cameras
     public Camera outlineCameraDuplicate;
     public Camera distortionCameraDuplicate;
 
+    // source texture
     public RenderTexture renderedSource;
-    public RenderTexture tempTexture;
 
+    // outline pass
     public bool outlineMapView;
     [Range(0.001f, 0.7f)]
     public float outlineThreshold = 0.1f;
@@ -20,46 +32,62 @@ public class OutlinesPostPro : PostProPP
     public RenderTexture outputOutline;
     private int kernelOutline;
 
+    // distortion pass
     public bool distortionMapView;
     public Shader distortionShader;
     public RenderTexture distortionMap;
     RedirectRender distortionRedirectRender;
-    public RenderTexture outputDistortion;
-    public Vector3 cameraMotionDirection;
-    private int kernelDistortion;
+    public RenderTexture outputPreDistortion;
+    public RenderTexture outputPostDistortion;
+    public Vector2 cameraVelocity;
+    private int kernelPreDistortion;
+    private int kernelPostDistortion;
 
-
-    [ExecuteInEditMode]
-    protected override void Init()
+    private void Init()
     {
-        base.Init();
+        if (!SystemInfo.supportsComputeShaders)
+        {
+            Debug.LogError("It seems your target Hardware does not support Compute Shaders.");
+            return;
+        }
+        if (!shader)
+        {
+            Debug.LogError("No shader");
+            return;
+        }
+        thisCamera = GetComponent<Camera>();
+        if (!thisCamera)
+        {
+            Debug.LogError("Object has no Camera");
+            return;
+        }
+
         CreateTextures();
-        //tempTexture = RenderTexture.GetTemporary();
 
         kernelOutline = shader.FindKernel("Outline");
         outlineCameraDuplicate.enabled = false;
         outlineCameraDuplicate.SetReplacementShader(outlineShader, "OutlineType"); //????
 
 
-        kernelDistortion = shader.FindKernel("CameraMotionDistortion");
+        kernelPreDistortion = shader.FindKernel("CombineDistortiondMap");
+        kernelPostDistortion = shader.FindKernel("DisortionAlongVelocity");
+
         distortionCameraDuplicate.targetTexture = distortionMap;
         distortionCameraDuplicate.enabled = false;
         distortionRedirectRender = distortionCameraDuplicate.gameObject.GetComponent<RedirectRender>();
         distortionRedirectRender.textToBlitTo = distortionMap;
+
+        init = true;
     }
 
-    protected override void ClearTextures()
+    private void CreateTexture(ref RenderTexture textureToMake, int divide = 1)
     {
-        ClearTexture(ref renderedSource);
-        ClearTexture(ref outlineMap);
-        ClearTexture(ref outputOutline);
-
-        ClearTexture(ref distortionMap);
-        ClearTexture(ref outputDistortion);
+        textureToMake = new RenderTexture(texSize.x / divide, texSize.y / divide, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+        textureToMake.enableRandomWrite = true;
+        textureToMake.Create();
     }
-
     [ExecuteInEditMode]
-    protected override void CreateTextures()
+    private void CreateTextures()
     {
         texSize.x = thisCamera.pixelWidth;
         texSize.y = thisCamera.pixelHeight;
@@ -74,18 +102,22 @@ public class OutlinesPostPro : PostProPP
         }
 
         CreateTexture(ref renderedSource);
-        shader.SetTexture(kernelOutline, "source", renderedSource);
         CreateTexture(ref outlineMap);
-        shader.SetTexture(kernelOutline, "outlineMap", outlineMap);
         CreateTexture(ref outputOutline);
-        //outputOutline.enableRandomWrite = true;
+        shader.SetTexture(kernelOutline, "source", renderedSource);
+        shader.SetTexture(kernelOutline, "outlineMap", outlineMap);
         shader.SetTexture(kernelOutline, "outputOutline", outputOutline);
 
-        shader.SetTexture(kernelDistortion, "outputOutline", outputOutline);
         CreateTexture(ref distortionMap);
-        shader.SetTexture(kernelDistortion, "distortionMap", distortionMap);
-        CreateTexture(ref outputDistortion);
-        shader.SetTexture(kernelDistortion, "outputDistortion", outputDistortion);
+        CreateTexture(ref outputPreDistortion);
+        shader.SetTexture(kernelPreDistortion, "outputOutline", outputOutline);
+        shader.SetTexture(kernelPreDistortion, "distortionMap", distortionMap);
+        shader.SetTexture(kernelPreDistortion, "outputPreDistortion", outputPreDistortion);
+
+        CreateTexture(ref outputPostDistortion);
+        shader.SetTexture(kernelPostDistortion, "distortionMap", distortionMap);
+        shader.SetTexture(kernelPostDistortion, "outputPreDistortion", outputPreDistortion);
+        shader.SetTexture(kernelPostDistortion, "outputPostDistortion", outputPostDistortion);
     }
 
     [ExecuteInEditMode]
@@ -102,15 +134,15 @@ public class OutlinesPostPro : PostProPP
         shader.SetBool("outlineMapView", outlineMapView);
         shader.SetBool("distortionMapView", distortionMapView);
         shader.SetFloat("outlineThreshold", outlineThreshold);
+        shader.SetFloats("cameraVelocity",  cameraVelocity.x, cameraVelocity.y);
     }
 
     [ExecuteInEditMode]
-    protected override void DispatchWithSource(ref RenderTexture source, ref RenderTexture destination)
+    private void DispatchWithSource(ref RenderTexture source, ref RenderTexture destination)
     {
         if ((!init) || (!readyForPostPro)) return;
 
         Graphics.Blit(source, renderedSource);
-        //Graphics.Blit(tempTexture, renderedSource);
 
         outlineCameraDuplicate.targetTexture = outlineMap;
         outlineCameraDuplicate.RenderWithShader(outlineShader, "OutlineType");
@@ -121,13 +153,14 @@ public class OutlinesPostPro : PostProPP
         distortionCameraDuplicate.targetTexture = distortionMap;
         distortionCameraDuplicate.Render();
         distortionMap = distortionCameraDuplicate.activeTexture;
-        shader.Dispatch(kernelDistortion, groupSize.x, groupSize.y, 1);
+        shader.Dispatch(kernelPreDistortion, groupSize.x, groupSize.y, 1);
+        shader.Dispatch(kernelPostDistortion, groupSize.x, groupSize.y, 1);
 
-        Graphics.Blit(outputDistortion, destination);
+        Graphics.Blit(outputPostDistortion, destination);
     }
 
     [ExecuteInEditMode]
-    protected override void OnRenderImage(RenderTexture source, RenderTexture destination)
+    private void OnRenderImage(RenderTexture source, RenderTexture destination)
     {
         outlineCameraDuplicate.CopyFrom(thisCamera);
         distortionCameraDuplicate.CopyFrom(thisCamera);
@@ -148,7 +181,7 @@ public class OutlinesPostPro : PostProPP
         }
     }
 
-    protected override void CheckResolution(out bool resChange)
+    private void CheckResolution(out bool resChange)
     {
         resChange = false;
 
@@ -158,5 +191,40 @@ public class OutlinesPostPro : PostProPP
             CreateTextures();
         }
     }
+    private void ClearTexture(ref RenderTexture textureToClear)
+    {
+        if (null != textureToClear)
+        {
+            textureToClear.Release();
+            textureToClear = null;
+        }
+    }
+    private void ClearTextures()
+    {
+        ClearTexture(ref renderedSource);
+        ClearTexture(ref outlineMap);
+        ClearTexture(ref outputOutline);
 
+        ClearTexture(ref distortionMap);
+        ClearTexture(ref outputPreDistortion);
+    }
+
+    [ExecuteInEditMode]
+    private void OnEnable()
+    {
+        Init();
+        CreateTextures();
+    }
+    [ExecuteInEditMode]
+    private void OnDisable()
+    {
+        ClearTextures();
+        init = false;
+    }
+    [ExecuteInEditMode]
+    private void OnDestroy()
+    {
+        ClearTextures();
+        init = false;
+    }
 }

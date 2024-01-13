@@ -1,21 +1,33 @@
 
 #pragma kernel Outline
-#pragma kernel CameraMotionDistortion
-#pragma kernel Combine
+#pragma kernel CombineDistortiondMap
+#pragma kernel DisortionAlongVelocity
 
 Texture2D<float4> source;
 Texture2D<float4> outlineMap;
 shared RWTexture2D<float4> outputOutline;
 
 Texture2D<float4> distortionMap;
-RWTexture2D<float4> outputDistortion;
+RWTexture2D<float4> outputPreDistortion;
+RWTexture2D<float4> outputPostDistortion;
 
 int2 screenResolution;
 float outlineThreshold;
 bool outlineMapView;
 
-float2 cameraMotionDirection;
+float2 cameraVelocity;
 bool distortionMapView;
+
+float inverseLerp(float a, float b, float v)
+{
+    return (v - a) / (b - a);
+}
+
+float remap(float iMin, float iMax, float oMin, float oMax, float v)
+{
+    float t = inverseLerp(iMin, iMax, v);
+    return lerp(oMin, oMax, t);
+}
 
 bool withinScreen(uint2 id)
 {
@@ -30,6 +42,16 @@ bool withinScreen(uint2 id)
         return false;
     }
     return true;
+}
+
+uint2 clampWithinScreen(uint2 id)
+{
+    id.x = min(id.x, screenResolution.x);
+    id.x = max(id.x, 0);
+    id.y = min(id.y, screenResolution.y);
+    id.y = max(id.y, 0);
+    
+    return id;
 }
 
 [numthreads(64, 16, 1)]
@@ -78,23 +100,40 @@ void Outline(uint3 id : SV_DispatchThreadID)
 }
 
 [numthreads(64, 16, 1)]
-void CameraMotionDistortion(uint3 id : SV_DispatchThreadID)
+void CombineDistortiondMap(uint3 id : SV_DispatchThreadID)
 {
     float4 thisPixelSource = outputOutline[id.xy];
     float4 thisPixelDistortion = distortionMap[id.xy];
-    float hasDistortionTexture = thisPixelDistortion.w; //(0): no distortioin; (1): has distortion; 
+    float hasDistortionTexture = thisPixelDistortion.w; //(0): no billboard to distort; (1): has billboard to distort; 
     
     if (distortionMapView && !outlineMapView)
     {
-        outputDistortion[id.xy] = thisPixelDistortion;
+        outputPreDistortion[id.xy] = thisPixelDistortion;
         return;
     }
     
-    outputDistortion[id.xy] = lerp(thisPixelSource, thisPixelDistortion, hasDistortionTexture);
-   // outputDistortion[id.xy] = thisPixelDistortion;
-}
+    outputPreDistortion[id.xy] = lerp(thisPixelSource, thisPixelDistortion, hasDistortionTexture);
+ }
 
 [numthreads(64, 16, 1)]
-void Combine(uint3 id : SV_DispatchThreadID)
+void DisortionAlongVelocity(uint3 id : SV_DispatchThreadID)
 {
+    uint count = (uint) ceil(length(cameraVelocity));
+    uint2 velocityOffset = (uint2) cameraVelocity;
+    float4 thisPixelDistortion = distortionMap[id.xy];
+    float hasDistortionTexture = thisPixelDistortion.w;
+    
+    float4 currentPixel = outputPreDistortion[id.xy];
+    if (hasDistortionTexture > 0.0f)
+    {
+         [unroll(50)]
+        for (int x = 0; x < count * 2; x++)
+        {
+            uint2 index = clampWithinScreen(id.xy - uint2(count, count) + uint2(x, x));
+            currentPixel += distortionMap[index] * (1.0f - thisPixelDistortion.w);
+        }
+        currentPixel /= (count * 2);
+    }
+    
+    outputPostDistortion[id.xy] = currentPixel;
 }
