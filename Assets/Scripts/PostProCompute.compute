@@ -15,6 +15,8 @@ int2 screenResolution;
 float outlineThreshold;
 bool outlineMapView;
 
+float skewAngle;
+int lengthOfVector; // temp
 float2 cameraVelocity;
 bool distortionMapView;
 
@@ -50,6 +52,14 @@ uint2 clampWithinScreen(uint2 id)
     id.x = max(id.x, 0);
     id.y = min(id.y, screenResolution.y);
     id.y = max(id.y, 0);
+    
+    return id;
+}
+
+uint2 absV2(uint2 id)
+{
+    id.x = max(id.x, -id.x);
+    id.y = max(id.y, -id.y);
     
     return id;
 }
@@ -118,22 +128,36 @@ void CombineDistortiondMap(uint3 id : SV_DispatchThreadID)
 [numthreads(64, 16, 1)]
 void DisortionAlongVelocity(uint3 id : SV_DispatchThreadID)
 {
-    uint count = (uint) ceil(length(cameraVelocity));
+    //uint count = (uint) ceil(length(cameraVelocity));
+    uint count = (uint) abs(lengthOfVector);
+    
     uint2 velocityOffset = (uint2) cameraVelocity;
+    float4 thisPixelSource = outputPreDistortion[id.xy];
     float4 thisPixelDistortion = distortionMap[id.xy];
+    
     float hasDistortionTexture = thisPixelDistortion.w;
+    float weight = thisPixelDistortion.w;
     
     float4 currentPixel = outputPreDistortion[id.xy];
-    if (hasDistortionTexture > 0.0f)
+    if ( /*hasDistortionTexture > 0.0f &&*/count * hasDistortionTexture > 0.0f)
     {
          [unroll(50)]
-        for (int x = 0; x < count * 2; x++)
+        for (int x = 0; x < count*2 ; ++x)
         {
-            uint2 index = clampWithinScreen(id.xy - uint2(count, count) + uint2(x, x));
-            currentPixel += distortionMap[index] * (1.0f - thisPixelDistortion.w);
+           // uint2 index = id.xy - absV2((uint2) (velocityOffset)) * count + ((uint2) (velocityOffset)) * x;
+            uint2 index = id.xy - uint2(count, count) + uint2(x, x);
+            
+            if (withinScreen(index))
+            {
+                currentPixel += outputPreDistortion[index]; // * 2.0 * (1.0f - thisPixelDistortion.w);
+                weight *= thisPixelDistortion.w;
+            }
         }
+        clamp(currentPixel, 0.0f, 1.0f);
         currentPixel /= (count * 2);
+        currentPixel.w = weight;
     }
     
     outputPostDistortion[id.xy] = currentPixel;
+    //outputPostDistortion[id.xy] = lerp(thisPixelSource, currentPixel, hasDistortionTexture);
 }

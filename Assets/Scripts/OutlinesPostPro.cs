@@ -40,6 +40,8 @@ public class OutlinesPostPro : MonoBehaviour
     public RenderTexture outputPreDistortion;
     public RenderTexture outputPostDistortion;
     public Vector2 cameraVelocity;
+    public float skewAngle;
+    public int lengthOfVector;
     private int kernelPreDistortion;
     private int kernelPostDistortion;
 
@@ -134,6 +136,8 @@ public class OutlinesPostPro : MonoBehaviour
         shader.SetBool("outlineMapView", outlineMapView);
         shader.SetBool("distortionMapView", distortionMapView);
         shader.SetFloat("outlineThreshold", outlineThreshold);
+        shader.SetFloat("skewAngle", skewAngle);
+        shader.SetInt("lengthOfVector", lengthOfVector);
         shader.SetFloats("cameraVelocity",  cameraVelocity.x, cameraVelocity.y);
     }
 
