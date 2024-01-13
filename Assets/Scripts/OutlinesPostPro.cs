@@ -40,10 +40,16 @@ public class OutlinesPostPro : MonoBehaviour
     public RenderTexture outputPreDistortion;
     public RenderTexture outputPostDistortion;
     public Vector2 cameraVelocity;
-    public float skewAngle;
+    public float skewAngleDegrees;
     public int lengthOfVector;
-    private int kernelPreDistortion;
-    private int kernelPostDistortion;
+    private int kernelCombinePasses;
+    private int kernelApplyDistortion;
+
+    // texture rotation
+    int kernelSkewTexture;
+    int kernelUnskewTexture;
+    public RenderTexture skewedPreDistortion;
+    public RenderTexture unskewedPostDistortion;
 
     private void Init()
     {
@@ -71,13 +77,16 @@ public class OutlinesPostPro : MonoBehaviour
         outlineCameraDuplicate.SetReplacementShader(outlineShader, "OutlineType"); //????
 
 
-        kernelPreDistortion = shader.FindKernel("CombineDistortiondMap");
-        kernelPostDistortion = shader.FindKernel("DisortionAlongVelocity");
+        kernelCombinePasses = shader.FindKernel("CombineDistortiondMap");
+        kernelApplyDistortion = shader.FindKernel("DisortionAlongVelocity");
 
         distortionCameraDuplicate.targetTexture = distortionMap;
         distortionCameraDuplicate.enabled = false;
         distortionRedirectRender = distortionCameraDuplicate.gameObject.GetComponent<RedirectRender>();
         distortionRedirectRender.textToBlitTo = distortionMap;
+
+        kernelSkewTexture = shader.FindKernel("SkewTexture");
+        kernelUnskewTexture = shader.FindKernel("UnskewTexture");
 
         init = true;
     }
@@ -111,15 +120,23 @@ public class OutlinesPostPro : MonoBehaviour
         shader.SetTexture(kernelOutline, "outputOutline", outputOutline);
 
         CreateTexture(ref distortionMap);
+        CreateTexture(ref skewedPreDistortion);
+        shader.SetTexture(kernelSkewTexture, "distortionMap", distortionMap);
+        shader.SetTexture(kernelSkewTexture, "skewedPreDistortion", skewedPreDistortion);
+
         CreateTexture(ref outputPreDistortion);
-        shader.SetTexture(kernelPreDistortion, "outputOutline", outputOutline);
-        shader.SetTexture(kernelPreDistortion, "distortionMap", distortionMap);
-        shader.SetTexture(kernelPreDistortion, "outputPreDistortion", outputPreDistortion);
+        shader.SetTexture(kernelApplyDistortion, "distortionMap", distortionMap);
+        shader.SetTexture(kernelApplyDistortion, "skewedPreDistortion", skewedPreDistortion);
+        shader.SetTexture(kernelApplyDistortion, "outputPreDistortion", outputPreDistortion); 
+
+        CreateTexture(ref unskewedPostDistortion);
+        shader.SetTexture(kernelUnskewTexture, "outputPreDistortion", outputPreDistortion);
+        shader.SetTexture(kernelUnskewTexture, "unskewedPostDistortion", unskewedPostDistortion);
 
         CreateTexture(ref outputPostDistortion);
-        shader.SetTexture(kernelPostDistortion, "distortionMap", distortionMap);
-        shader.SetTexture(kernelPostDistortion, "outputPreDistortion", outputPreDistortion);
-        shader.SetTexture(kernelPostDistortion, "outputPostDistortion", outputPostDistortion);
+        shader.SetTexture(kernelCombinePasses, "outputOutline", outputOutline);
+        shader.SetTexture(kernelCombinePasses, "unskewedPostDistortion", unskewedPostDistortion);
+        shader.SetTexture(kernelCombinePasses, "outputPostDistortion", outputPostDistortion);
     }
 
     [ExecuteInEditMode]
@@ -136,7 +153,7 @@ public class OutlinesPostPro : MonoBehaviour
         shader.SetBool("outlineMapView", outlineMapView);
         shader.SetBool("distortionMapView", distortionMapView);
         shader.SetFloat("outlineThreshold", outlineThreshold);
-        shader.SetFloat("skewAngle", skewAngle);
+        shader.SetFloat("skewAngleRadians", skewAngleDegrees * Mathf.Deg2Rad);
         shader.SetInt("lengthOfVector", lengthOfVector);
         shader.SetFloats("cameraVelocity",  cameraVelocity.x, cameraVelocity.y);
     }
@@ -157,8 +174,12 @@ public class OutlinesPostPro : MonoBehaviour
         distortionCameraDuplicate.targetTexture = distortionMap;
         distortionCameraDuplicate.Render();
         distortionMap = distortionCameraDuplicate.activeTexture;
-        shader.Dispatch(kernelPreDistortion, groupSize.x, groupSize.y, 1);
-        shader.Dispatch(kernelPostDistortion, groupSize.x, groupSize.y, 1);
+
+        shader.Dispatch(kernelSkewTexture, groupSize.x, groupSize.y, 1);
+        shader.Dispatch(kernelApplyDistortion, groupSize.x, groupSize.y, 1);
+        shader.Dispatch(kernelUnskewTexture, groupSize.x, groupSize.y, 1);
+
+        shader.Dispatch(kernelCombinePasses, groupSize.x, groupSize.y, 1);
 
         Graphics.Blit(outputPostDistortion, destination);
     }

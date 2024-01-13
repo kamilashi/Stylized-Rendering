@@ -1,21 +1,25 @@
 
 #pragma kernel Outline
-#pragma kernel CombineDistortiondMap
+#pragma kernel SkewTexture
 #pragma kernel DisortionAlongVelocity
+#pragma kernel UnskewTexture
+#pragma kernel CombineDistortiondMap
 
 Texture2D<float4> source;
 Texture2D<float4> outlineMap;
 shared RWTexture2D<float4> outputOutline;
 
 Texture2D<float4> distortionMap;
-RWTexture2D<float4> outputPreDistortion;
-RWTexture2D<float4> outputPostDistortion;
+RWTexture2D<float4> skewedPreDistortion;
+RWTexture2D<float4> outputPreDistortion; // to distorted
+RWTexture2D<float4> unskewedPostDistortion;
+RWTexture2D<float4> outputPostDistortion; // rename to combined
 
 int2 screenResolution;
 float outlineThreshold;
 bool outlineMapView;
 
-float skewAngle;
+float skewAngleRadians;
 int lengthOfVector; // temp
 float2 cameraVelocity;
 bool distortionMapView;
@@ -110,20 +114,16 @@ void Outline(uint3 id : SV_DispatchThreadID)
 }
 
 [numthreads(64, 16, 1)]
-void CombineDistortiondMap(uint3 id : SV_DispatchThreadID)
+void SkewTexture(uint3 id : SV_DispatchThreadID)
 {
-    float4 thisPixelSource = outputOutline[id.xy];
-    float4 thisPixelDistortion = distortionMap[id.xy];
-    float hasDistortionTexture = thisPixelDistortion.w; //(0): no billboard to distort; (1): has billboard to distort; 
+    float4 thisPixelSource = distortionMap[id.xy];
     
-    if (distortionMapView && !outlineMapView)
-    {
-        outputPreDistortion[id.xy] = thisPixelDistortion;
-        return;
-    }
+    float shearXY = tan(-skewAngleRadians);
+    float2x2 shearMatrix = float2x2(1 + shearXY * shearXY, shearXY, shearXY, 1);
+    uint2 skewedCoords = mul(shearMatrix, id.xy);
     
-    outputPreDistortion[id.xy] = lerp(thisPixelSource, thisPixelDistortion, hasDistortionTexture);
- }
+   skewedPreDistortion[skewedCoords] = thisPixelSource;
+}
 
 [numthreads(64, 16, 1)]
 void DisortionAlongVelocity(uint3 id : SV_DispatchThreadID)
@@ -132,25 +132,24 @@ void DisortionAlongVelocity(uint3 id : SV_DispatchThreadID)
     uint count = (uint) abs(lengthOfVector);
     
     uint2 velocityOffset = (uint2) cameraVelocity;
-    float4 thisPixelSource = outputPreDistortion[id.xy];
-    float4 thisPixelDistortion = distortionMap[id.xy];
+    //float4 thisPixelSource = outputPreDistortion[id.xy];
+    float4 thisPixelDistortion = skewedPreDistortion[id.xy];
     
     float hasDistortionTexture = thisPixelDistortion.w;
     float weight = thisPixelDistortion.w;
     
-    float4 currentPixel = outputPreDistortion[id.xy];
-    if ( /*hasDistortionTexture > 0.0f &&*/count * hasDistortionTexture > 0.0f)
+    float4 currentPixel = thisPixelDistortion;
+    if ( count * hasDistortionTexture > 0.0f)
     {
          [unroll(50)]
         for (int x = 0; x < count*2 ; ++x)
         {
-           // uint2 index = id.xy - absV2((uint2) (velocityOffset)) * count + ((uint2) (velocityOffset)) * x;
-            uint2 index = id.xy - uint2(count, count) + uint2(x, x);
+            uint2 index = id.xy - uint2(count, count) + uint2(x, 0);
             
             if (withinScreen(index))
             {
-                currentPixel += outputPreDistortion[index]; // * 2.0 * (1.0f - thisPixelDistortion.w);
-                weight *= thisPixelDistortion.w;
+                currentPixel += skewedPreDistortion[index]; // * 2.0 * (1.0f - thisPixelDistortion.w);
+                //weight *= thisPixelDistortion.w;
             }
         }
         clamp(currentPixel, 0.0f, 1.0f);
@@ -158,6 +157,33 @@ void DisortionAlongVelocity(uint3 id : SV_DispatchThreadID)
         currentPixel.w = weight;
     }
     
-    outputPostDistortion[id.xy] = currentPixel;
-    //outputPostDistortion[id.xy] = lerp(thisPixelSource, currentPixel, hasDistortionTexture);
+    outputPreDistortion[id.xy] = currentPixel;
+}
+
+[numthreads(64, 16, 1)]
+void UnskewTexture(uint3 id : SV_DispatchThreadID)
+{
+    float4 thisPixelSource = outputPreDistortion[id.xy];
+    
+    float shearXY = tan(skewAngleRadians);
+    float2x2 shearMatrix = float2x2(1 + shearXY * shearXY, shearXY, shearXY, 1);
+    uint2 skewedCoords = mul(shearMatrix, id.xy);
+    
+    unskewedPostDistortion[skewedCoords] = thisPixelSource;
+}
+
+[numthreads(64, 16, 1)]
+void CombineDistortiondMap(uint3 id : SV_DispatchThreadID)
+{
+    float4 thisPixelSource = outputOutline[id.xy];
+    float4 thisPixelDistortion = unskewedPostDistortion[id.xy];
+    float hasDistortionTexture = thisPixelDistortion.w; //(0): no billboard to distort; (1): has billboard to distort; 
+    
+    if (distortionMapView && !outlineMapView)
+    {
+        outputPostDistortion[id.xy] = thisPixelDistortion;
+        return;
+    }
+    
+    outputPostDistortion[id.xy] = lerp(thisPixelSource, thisPixelDistortion, hasDistortionTexture);
 }
