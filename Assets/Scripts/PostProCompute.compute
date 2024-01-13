@@ -1,12 +1,21 @@
+
 #pragma kernel Outline
+#pragma kernel CameraMotionDistortion
 #pragma kernel Combine
 
-shared Texture2D<float4> source;
-shared Texture2D<float4> outlineMap;
-RWTexture2D<float4> output;
+Texture2D<float4> source;
+Texture2D<float4> outlineMap;
+shared RWTexture2D<float4> outputOutline;
+
+Texture2D<float4> distortionMap;
+RWTexture2D<float4> outputDistortion;
+
 int2 screenResolution;
 float outlineThreshold;
 bool outlineMapView;
+
+float2 cameraMotionDirection;
+bool distortionMapView;
 
 bool withinScreen(uint2 id)
 {
@@ -31,43 +40,58 @@ void Outline(uint3 id : SV_DispatchThreadID)
     float4 thisPixelSource = source[id.xy];
     float outline = 0;
     
+    float thisPixelColorLength = length(thisPixelColor);
     
+    if ((thisPixelColorLength == 0) || (outlineMapView && !distortionMapView))
+    {
+        outputOutline[id.xy] = thisPixel;
+        return;
+    }
     
-    
-    if ((length(thisPixelColor) == 0) || (outlineMapView))
-        {
-            output[id.xy] = thisPixel;
-            return;
-        }
-    
-        uint2 lowerPixelId = uint2(id.x, (id.y + 1));
+    uint2 lowerPixelId = uint2(id.x, (id.y + 1));
         
-        if (withinScreen(lowerPixelId))
-            {
-            float3 lowerPixelColor = float3(outlineMap[lowerPixelId].x, outlineMap[lowerPixelId].y, outlineMap[lowerPixelId].z);
-            float4 lowerPixel = outlineMap[lowerPixelId];
-            if (abs(length(lowerPixelColor) - length(thisPixelColor)) > outlineThreshold)
-                {
-                    thisPixel = float4(0, 0, 0, 1);
-                    outline = 1;
-
-            }
-            }
-        uint2 rightPixelId = uint2((id.x + 1), (id.y));
-        if (withinScreen(rightPixelId))
+    if (withinScreen(lowerPixelId))
+    {
+        float3 lowerPixelColor = float3(outlineMap[lowerPixelId].x, outlineMap[lowerPixelId].y, outlineMap[lowerPixelId].z);
+        float4 lowerPixel = outlineMap[lowerPixelId];
+        if (abs(length(lowerPixelColor) - thisPixelColorLength) > outlineThreshold)
         {
-            float3 rightPixelColor = float3(outlineMap[rightPixelId].x, outlineMap[rightPixelId].y, outlineMap[rightPixelId].z);
-            float4 rightPixel = outlineMap[rightPixelId];
-            if (abs(length(rightPixelColor) - length(thisPixelColor)) > outlineThreshold)
-            {
-                thisPixel = float4(0, 0, 0, 1);
-                outline = 1;
-            }
-        }
-    
+            thisPixel = float4(0, 0, 0, 1);
+            outline = 1;
 
+        }
+    }
     
-    output[id.xy] = lerp(thisPixelSource, thisPixel, outline);
+    uint2 rightPixelId = uint2((id.x + 1), (id.y));
+    if (withinScreen(rightPixelId))
+    {
+        float3 rightPixelColor = float3(outlineMap[rightPixelId].x, outlineMap[rightPixelId].y, outlineMap[rightPixelId].z);
+        float4 rightPixel = outlineMap[rightPixelId];
+        if (abs(length(rightPixelColor) - thisPixelColorLength) > outlineThreshold)
+        {
+            thisPixel = float4(0, 0, 0, 1);
+            outline = 1;
+        }
+    }
+    
+    outputOutline[id.xy] = lerp(thisPixelSource, thisPixel, outline);
+}
+
+[numthreads(64, 16, 1)]
+void CameraMotionDistortion(uint3 id : SV_DispatchThreadID)
+{
+    float4 thisPixelSource = outputOutline[id.xy];
+    float4 thisPixelDistortion = distortionMap[id.xy];
+    float hasDistortionTexture = thisPixelDistortion.w; //(0): no distortioin; (1): has distortion; 
+    
+    if (distortionMapView && !outlineMapView)
+    {
+        outputDistortion[id.xy] = thisPixelDistortion;
+        return;
+    }
+    
+    outputDistortion[id.xy] = lerp(thisPixelSource, thisPixelDistortion, hasDistortionTexture);
+   // outputDistortion[id.xy] = thisPixelDistortion;
 }
 
 [numthreads(64, 16, 1)]

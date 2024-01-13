@@ -2,23 +2,27 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+[ExecuteInEditMode]
 [RequireComponent(typeof(Camera))]
-public class PostProPP : MonoBehaviour
+public abstract class PostProPP : MonoBehaviour
 {
     public ComputeShader shader = null;
 
-    protected string kernelName = "OutlinePostPro";
+  //  private string baseKernel = "Combine";
 
     protected Vector2Int texSize = new Vector2Int(0, 0);
     protected Vector2Int groupSize = new Vector2Int();
     protected Camera thisCamera;
-    
-    [SerializeField]
-    protected RenderTexture output = null;
-    [SerializeField]
-    protected RenderTexture renderedSource = null;
 
-    protected int kernelPostPro = -1;
+/*
+    [SerializeField]
+    private RenderTexture sourceTexture = null;
+    private string sourceTextureName;
+    [SerializeField]
+    private RenderTexture outputTexture = null;
+    private string outputTextureName;*/
+
+  //  private int defaultKernel = -1;
     protected bool init = false;
 
     protected virtual void Init()
@@ -35,7 +39,7 @@ public class PostProPP : MonoBehaviour
             return;
         }
 
-        kernelPostPro = shader.FindKernel(kernelName);
+        //defaultKernel = shader.FindKernel(baseKernel);
 
         thisCamera = GetComponent<Camera>();
 
@@ -45,9 +49,8 @@ public class PostProPP : MonoBehaviour
             return;
         }
 
-        CreateTextures();
-
         init = true;
+        //CreateTextures();
     }
 
     protected void ClearTexture(ref RenderTexture textureToClear)
@@ -58,11 +61,11 @@ public class PostProPP : MonoBehaviour
             textureToClear = null;
         }
     }
-
     protected virtual void ClearTextures()
     {
-        ClearTexture(ref output);
-        ClearTexture(ref renderedSource);
+/*
+        ClearTexture(ref outputTexture);
+        ClearTexture(ref sourceTexture);*/
     }
 
     protected void CreateTexture(ref RenderTexture textureToMake, int divide = 1)
@@ -72,9 +75,9 @@ public class PostProPP : MonoBehaviour
         textureToMake.Create();
     }
 
-
-    protected virtual void CreateTextures()
+    protected virtual void CreateTextures()//only used in base class
     {
+/*
         texSize.x = thisCamera.pixelWidth;
         texSize.y = thisCamera.pixelHeight;
 
@@ -83,31 +86,31 @@ public class PostProPP : MonoBehaviour
         {
             shader.SetInts("screenResolution", new int[] { texSize.x, texSize.y });
             uint x, y;
-            shader.GetKernelThreadGroupSizes(kernelPostPro, out x, out y, out _);
+            shader.GetKernelThreadGroupSizes(defaultKernel, out x, out y, out _);
             groupSize.x = Mathf.CeilToInt((float)texSize.x / (float)x);
             groupSize.y = Mathf.CeilToInt((float)texSize.y / (float)y);
         }
 
-        CreateTexture(ref output);
-        CreateTexture(ref renderedSource);
+        CreateTexture(ref sourceTexture);
+        CreateTexture(ref outputTexture);
 
-        shader.SetTexture(kernelPostPro, "source", renderedSource);
-        shader.SetTexture(kernelPostPro, "output", output);
+        shader.SetTexture(defaultKernel, this.sourceTextureName, sourceTexture);
+        shader.SetTexture(defaultKernel, this.outputTextureName, outputTexture);*/
     }
 
-    protected virtual void OnEnable()
+    protected void OnEnable()
     {
         Init();
         CreateTextures();
     }
 
-    protected virtual void OnDisable()
+    protected void OnDisable()
     {
         ClearTextures();
         init = false;
     }
 
-    protected virtual void OnDestroy()
+    protected void OnDestroy()
     {
         ClearTextures();
         init = false;
@@ -115,14 +118,16 @@ public class PostProPP : MonoBehaviour
 
     protected virtual void DispatchWithSource(ref RenderTexture source, ref RenderTexture destination)
     {
-        Graphics.Blit(source, renderedSource);
+        Graphics.Blit(source, destination);
+/*
+        Graphics.Blit(source, sourceTexture);
 
-        shader.Dispatch(kernelPostPro, groupSize.x, groupSize.y, 1);
+        shader.Dispatch(defaultKernel, groupSize.x, groupSize.y, 1);
 
-        Graphics.Blit(output, destination);
+        Graphics.Blit(outputTexture, destination);*/
     }
 
-    protected void CheckResolution(out bool resChange)
+    protected virtual void CheckResolution(out bool resChange)
     {
         resChange = false;
 
