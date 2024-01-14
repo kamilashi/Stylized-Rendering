@@ -13,9 +13,17 @@ public enum AxisNames {
     XMinusY
 }
 
-[ExecuteInEditMode]
+public static class Utils
+{
+    public static float Remap(this float value, float from1, float to1, float from2, float to2)
+    {
+        return (value - from1) / (to1 - from1) * (to2 - from2) + from2;
+    }
+}
+
+[ExecuteAlways]
 [RequireComponent(typeof(Camera))]
-public class OutlinesPostPro : MonoBehaviour
+public class PostProcessing : MonoBehaviour
 {
     // from parent class:
     public ComputeShader shader = null;
@@ -53,7 +61,12 @@ public class OutlinesPostPro : MonoBehaviour
     public Vector2 cameraVelocity;
     [Range(0, 359.9f)]
     public float skewAngleDegrees;
-    public int lengthOfVector;
+    private float skewAngleRadians;
+    public float cameraVelocityMagnitude;
+    public float velocityMagnitudeThreshold;
+    public float MaxMouseMotionLength;
+    public float dissipationSpeed;
+    public int blurRadius;
     public Vector2Int translateXY;
     [Range (0, 10)]
     public float scale;
@@ -67,6 +80,27 @@ public class OutlinesPostPro : MonoBehaviour
     public RenderTexture unskewedPostDistortion;
 
     public Hashtable AxisMap;
+    //private bool fadeout;
+    //private float timer;
+
+    private void Start()
+    {
+        Init();
+        CreateTextures();
+        MaxMouseMotionLength = Vector2.SqrMagnitude(new Vector2(Screen.width, Screen.height));
+    }
+    private void Update()
+    {
+        if (!init)
+            Init();
+        SetProperties();
+
+
+        if (cameraVelocityMagnitude > 0)
+        {
+            cameraVelocityMagnitude -= dissipationSpeed * Time.deltaTime;
+        }
+    }
 
     private void Init()
     {
@@ -176,6 +210,31 @@ public class OutlinesPostPro : MonoBehaviour
             }
         }
     }
+    public void UpdateCameraVelocity(Vector2 newVelocity)
+    {
+        float lengthOfVector = newVelocity.sqrMagnitude;
+        //blurRadius = (int) lengthOfVector * 10.0f; // to max blur radius
+        if (lengthOfVector > velocityMagnitudeThreshold && lengthOfVector > cameraVelocityMagnitude)
+        {
+            //lengthOfVector = Utils.Remap(lengthOfVector, 0, MaxMouseMotionLength, 0, 100.0f); // to max alpha
+            lengthOfVector /= 10.0f;// Utils.Remap(lengthOfVector, 0, MaxMouseMotionLength, 0, 100.0f); // to max alpha
+
+            newVelocity.Normalize();
+            skewAngleRadians = Mathf.Acos( Vector2.Dot(newVelocity, Vector2.right));
+            if (Vector2.Dot(newVelocity, Vector2.up) <= 0) // if larger than PI
+            {
+                skewAngleRadians = Mathf.PI - skewAngleRadians; // normalize to 180 <-> 360
+            }
+            skewAngleDegrees = skewAngleRadians * Mathf.Rad2Deg;
+            cameraVelocityMagnitude = lengthOfVector;
+        }
+        //else
+        //{
+        //    fadeout = true;
+        //    timer = 3;
+        //    //cameraVelocityMagnitude = 0.0f;
+        //}
+    }
 
     private void CreateTexture(ref RenderTexture textureToMake, int divide = 1)
     {
@@ -184,7 +243,8 @@ public class OutlinesPostPro : MonoBehaviour
         textureToMake.wrapMode = TextureWrapMode.Repeat;
         textureToMake.Create();
     }
-    [ExecuteInEditMode]
+
+    [ExecuteAlways]
     private void CreateTextures()
     {
         texSize.x = thisCamera.pixelWidth;
@@ -202,32 +262,33 @@ public class OutlinesPostPro : MonoBehaviour
         CreateTexture(ref renderedSource);
         CreateTexture(ref outlineMap);
         CreateTexture(ref outputOutline);
+        CreateTexture(ref distortionMap);
+        CreateTexture(ref skewedPreDistortion);
+        CreateTexture(ref outputPreDistortion);
+        CreateTexture(ref unskewedPostDistortion);
+        CreateTexture(ref outputPostDistortion);
+
         shader.SetTexture(kernelOutline, "source", renderedSource);
         shader.SetTexture(kernelOutline, "outlineMap", outlineMap);
         shader.SetTexture(kernelOutline, "outputOutline", outputOutline);
 
-        CreateTexture(ref distortionMap);
-        CreateTexture(ref skewedPreDistortion);
         shader.SetTexture(kernelSkewTexture, "distortionMap", distortionMap);
         shader.SetTexture(kernelSkewTexture, "skewedPreDistortion", skewedPreDistortion);
 
-        CreateTexture(ref outputPreDistortion);
         shader.SetTexture(kernelApplyDistortion, "distortionMap", distortionMap);
         shader.SetTexture(kernelApplyDistortion, "skewedPreDistortion", skewedPreDistortion);
         shader.SetTexture(kernelApplyDistortion, "outputPreDistortion", outputPreDistortion); 
 
-        CreateTexture(ref unskewedPostDistortion);
         shader.SetTexture(kernelUnskewTexture, "outputPreDistortion", outputPreDistortion);
         shader.SetTexture(kernelUnskewTexture, "skewedPreDistortion", skewedPreDistortion);
         shader.SetTexture(kernelUnskewTexture, "unskewedPostDistortion", unskewedPostDistortion);
 
-        CreateTexture(ref outputPostDistortion);
         shader.SetTexture(kernelCombinePasses, "outputOutline", outputOutline);
-        shader.SetTexture(kernelCombinePasses, "unskewedPostDistortion", unskewedPostDistortion);
+        shader.SetTexture(kernelCombinePasses, "outputPreDistortion", outputPreDistortion);
         shader.SetTexture(kernelCombinePasses, "outputPostDistortion", outputPostDistortion);
     }
 
-    [ExecuteInEditMode]
+    [ExecuteAlways]
     private void OnValidate()
     {
         if (!init)
@@ -235,23 +296,28 @@ public class OutlinesPostPro : MonoBehaviour
         SetProperties();
     }
 
-    [ExecuteInEditMode]
+    [ExecuteAlways]
     protected void SetProperties()
     {
         shader.SetBool("outlineMapView", outlineMapView);
         shader.SetBool("distortionMapView", distortionMapView);
         shader.SetFloat("outlineThreshold", outlineThreshold);
-        shader.SetFloat("skewAngleRadians", skewAngleDegrees * Mathf.Deg2Rad);
-        shader.SetInt("lengthOfVector", lengthOfVector);
+        shader.SetFloat("skewAngleRadians", skewAngleRadians);
+
+        int switchValue = Mathf.CeilToInt( cameraVelocityMagnitude);
+        blurRadius = (int)Mathf.Clamp(switchValue*cameraVelocityMagnitude, 0, 10);
+        shader.SetInt("blurRadius", blurRadius);
+
+        shader.SetFloat("cameraVelocityMagnitude", cameraVelocityMagnitude);
+
         shader.SetFloat("scale", scale);
         shader.SetInts("translateXY", translateXY.x, translateXY.y);
-        shader.SetFloats("cameraVelocity",  cameraVelocity.x, cameraVelocity.y);
 
         Vector2Int currentAxis = GetAxisFromDegree((int) skewAngleDegrees);
         shader.SetInts("blurAlongXY", currentAxis.x, currentAxis.y);
     }
 
-    [ExecuteInEditMode]
+    [ExecuteAlways]
     private void DispatchWithSource(ref RenderTexture source, ref RenderTexture destination)
     {
         if ((!init) || (!readyForPostPro)) return;
@@ -272,12 +338,12 @@ public class OutlinesPostPro : MonoBehaviour
         shader.Dispatch(kernelApplyDistortion, groupSize.x, groupSize.y, 1);
         //shader.Dispatch(kernelUnskewTexture, groupSize.x, groupSize.y, 1);
 
-        //shader.Dispatch(kernelCombinePasses, groupSize.x, groupSize.y, 1);
+        shader.Dispatch(kernelCombinePasses, groupSize.x, groupSize.y, 1);
 
-        Graphics.Blit(outputPreDistortion, destination);
+        Graphics.Blit(outputPostDistortion, destination);
     }
 
-    [ExecuteInEditMode]
+    [ExecuteAlways]
     private void OnRenderImage(RenderTexture source, RenderTexture destination)
     {
         outlineCameraDuplicate.CopyFrom(thisCamera);
@@ -327,19 +393,20 @@ public class OutlinesPostPro : MonoBehaviour
         ClearTexture(ref outputPreDistortion);
     }
 
-    [ExecuteInEditMode]
+    [ExecuteAlways]
     private void OnEnable()
     {
         Init();
         CreateTextures();
     }
-    [ExecuteInEditMode]
+
+    [ExecuteAlways]
     private void OnDisable()
     {
         ClearTextures();
         init = false;
     }
-    [ExecuteInEditMode]
+    [ExecuteAlways]
     private void OnDestroy()
     {
         ClearTextures();

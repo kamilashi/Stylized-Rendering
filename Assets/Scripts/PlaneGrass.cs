@@ -6,7 +6,7 @@ using UnityEngine;
 public class PlaneGrass : MonoBehaviour
 {
     public ComputeShader shader;
-    public OutlinesPostPro postproControllerScript;
+    public PostProcessing postproControllerScript;
     public int texResolution = 1024;
     public Material groundMaterial;
     public Material grassMaterial;

@@ -22,9 +22,10 @@ bool outlineMapView;
 
 bool distortionMapView;
 float skewAngleRadians;
-int lengthOfVector; // temp
+int cameraVelocityMagnitude; 
+int blurRadius; // temp
 int2 blurAlongXY;
-float2 cameraVelocity;
+//float2 cameraVelocity;
 
 uint2 translateXY;
 float scale;
@@ -160,17 +161,17 @@ void SkewTexture(uint3 id : SV_DispatchThreadID)
 void DisortionAlongVelocity(uint3 id : SV_DispatchThreadID)
 {
     //uint count = (uint) ceil(length(cameraVelocity));
-    uint count = (uint) abs(lengthOfVector);
+    uint count = (uint) abs(blurRadius);
     
-    uint2 velocityOffset = (uint2) cameraVelocity;
+    //uint2 velocityOffset = (uint2) cameraVelocity;
     //float4 thisPixelSource = outputPreDistortion[id.xy];
     float4 thisPixelDistortion = distortionMap[id.xy];
     
     float hasDistortionTexture = thisPixelDistortion.w;
-    float weight = thisPixelDistortion.w;
+   // float weight = thisPixelDistortion.w;
     
-    float4 currentPixel = thisPixelDistortion;
-    if ( count * hasDistortionTexture > 0.0f)
+    float4 currentPixel = float4(0,0,0,0);
+    if ( cameraVelocityMagnitude * hasDistortionTexture > 0.0f)
     {
          [unroll(50)]
         for (int i = 1; i <= count*2 ; i++)
@@ -185,7 +186,7 @@ void DisortionAlongVelocity(uint3 id : SV_DispatchThreadID)
         }
         clamp(currentPixel, 0.0f, 1.0f);
         currentPixel /= (count * 2);
-        currentPixel.w = weight;
+        currentPixel.w = thisPixelDistortion.w * clamp(cameraVelocityMagnitude, 0, 1);
     }
     
     outputPreDistortion[id.xy] = currentPixel;
@@ -228,7 +229,7 @@ void UnskewTexture(uint3 id : SV_DispatchThreadID)
 void CombineDistortiondMap(uint3 id : SV_DispatchThreadID)
 {
     float4 thisPixelSource = outputOutline[id.xy];
-    float4 thisPixelDistortion = unskewedPostDistortion[id.xy];
+    float4 thisPixelDistortion = outputPreDistortion[id.xy];
     float hasDistortionTexture = thisPixelDistortion.w; //(0): no billboard to distort; (1): has billboard to distort; 
     
     if (distortionMapView && !outlineMapView)
@@ -237,5 +238,9 @@ void CombineDistortiondMap(uint3 id : SV_DispatchThreadID)
         return;
     }
     
-    outputPostDistortion[id.xy] = lerp(thisPixelSource, thisPixelDistortion, hasDistortionTexture);
+    //float4 combined = lerp(thisPixelSource, thisPixelDistortion, hasDistortionTexture);
+    float4 combined = thisPixelDistortion * thisPixelDistortion.w + (1 - thisPixelDistortion.w) * thisPixelSource;
+    combined.w = 1;
+    outputPostDistortion[id.xy] = combined;
+
 }

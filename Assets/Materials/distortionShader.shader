@@ -1,5 +1,3 @@
-// Upgrade NOTE: replaced 'mul(UNITY_MATRIX_MVP,*)' with 'UnityObjectToClipPos(*)'
-
 Shader "Unlit/distortionShader"
 {
     Properties
@@ -11,18 +9,15 @@ Shader "Unlit/distortionShader"
     }
     SubShader
     {
-        Tags {
-            "DistortionType" = "Default"
-            "RenderType"="Transparent" }
+        Tags { "Queue" = "Transparent" "RenderType" = "Transparent"  "OutlineType" = "Foliage" }
         LOD 100
         ZWrite Off
-        Cull Off
         Blend SrcAlpha OneMinusSrcAlpha
 
         Pass
         {
             CGPROGRAM
-            #pragma vertex vert
+            #pragma vertex vert 
             #pragma fragment frag
 
             #include "../Scripts/Noises.cginc"
@@ -78,7 +73,7 @@ Shader "Unlit/distortionShader"
                 //i.uv.y -= perlinMask;
                 fixed4 col = tex2D(_MainTex, i.uv);
                 fixed alphaText = tex2D(_AlphaTex, i.uv).x;
-                col.w = col.w * 0.7;
+                //col.w = col.w * 0.7;
                 return col;
             }
             ENDCG
