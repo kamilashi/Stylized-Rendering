@@ -16,13 +16,23 @@ RWTexture2D<float4> unskewedPostDistortion;
 RWTexture2D<float4> outputPostDistortion; // rename to combined
 
 int2 screenResolution;
+
 float outlineThreshold;
 bool outlineMapView;
 
+bool distortionMapView;
 float skewAngleRadians;
 int lengthOfVector; // temp
+int2 blurAlongXY;
 float2 cameraVelocity;
-bool distortionMapView;
+
+uint2 translateXY;
+float scale;
+
+float modulo(float x, float y)
+{
+    return x - y * floor(x / y);
+}
 
 float inverseLerp(float a, float b, float v)
 {
@@ -117,13 +127,34 @@ void Outline(uint3 id : SV_DispatchThreadID)
 void SkewTexture(uint3 id : SV_DispatchThreadID)
 {
     float4 thisPixelSource = distortionMap[id.xy];
+    int2 skewedCoords = id.xy;
     
-    float shearXY = tan(-skewAngleRadians);
-    float2x2 shearMatrix = float2x2(1 + shearXY * shearXY, shearXY, shearXY, 1);
-    uint2 skewedCoords = mul(shearMatrix, id.xy);
+    //scale down/up
+    skewedCoords *= scale;
+        
+    // translate
+    skewedCoords += int2((translateXY.x), (translateXY.y));
     
-   skewedPreDistortion[skewedCoords] = thisPixelSource;
-}
+    // shear (rotate)
+    float shearX = tan(-skewAngleRadians);
+    float shearY = tan(skewAngleRadians);
+    float2x2 shearMatrix = float2x2(1, shearX, shearY, 1);
+    skewedCoords = mul(shearMatrix, skewedCoords);
+    
+    //wrap around
+    //the screen
+
+    if (skewedCoords.x >= screenResolution.x || skewedCoords.x < 0)
+    {
+        skewedCoords.x = (int) modulo(skewedCoords.x, screenResolution.x);
+    }
+    if (skewedCoords.y >= screenResolution.y || skewedCoords.y < 0)
+    {
+        skewedCoords.y = (int) modulo(skewedCoords.y, screenResolution.y);
+    }
+    
+    skewedPreDistortion[skewedCoords] = thisPixelSource;
+    }
 
 [numthreads(64, 16, 1)]
 void DisortionAlongVelocity(uint3 id : SV_DispatchThreadID)
@@ -133,7 +164,7 @@ void DisortionAlongVelocity(uint3 id : SV_DispatchThreadID)
     
     uint2 velocityOffset = (uint2) cameraVelocity;
     //float4 thisPixelSource = outputPreDistortion[id.xy];
-    float4 thisPixelDistortion = skewedPreDistortion[id.xy];
+    float4 thisPixelDistortion = distortionMap[id.xy];
     
     float hasDistortionTexture = thisPixelDistortion.w;
     float weight = thisPixelDistortion.w;
@@ -142,13 +173,13 @@ void DisortionAlongVelocity(uint3 id : SV_DispatchThreadID)
     if ( count * hasDistortionTexture > 0.0f)
     {
          [unroll(50)]
-        for (int x = 0; x < count*2 ; ++x)
+        for (int i = 1; i <= count*2 ; i++)
         {
-            uint2 index = id.xy - uint2(count, count) + uint2(x, 0);
+            uint2 index = id.xy - uint2(count, count) + uint2(i * blurAlongXY.x, i * blurAlongXY.y);
             
             if (withinScreen(index))
             {
-                currentPixel += skewedPreDistortion[index]; // * 2.0 * (1.0f - thisPixelDistortion.w);
+                currentPixel += distortionMap[index]; // * 2.0 * (1.0f - thisPixelDistortion.w);
                 //weight *= thisPixelDistortion.w;
             }
         }
@@ -164,10 +195,31 @@ void DisortionAlongVelocity(uint3 id : SV_DispatchThreadID)
 void UnskewTexture(uint3 id : SV_DispatchThreadID)
 {
     float4 thisPixelSource = outputPreDistortion[id.xy];
+    int2 skewedCoords = id.xy;
     
-    float shearXY = tan(skewAngleRadians);
-    float2x2 shearMatrix = float2x2(1 + shearXY * shearXY, shearXY, shearXY, 1);
-    uint2 skewedCoords = mul(shearMatrix, id.xy);
+    // shear (rotate)
+    float shearX = tan(skewAngleRadians);
+    float shearY = tan(-skewAngleRadians);
+    float2x2 shearMatrix = float2x2(1, shearX, shearY, 1);
+    skewedCoords = mul(shearMatrix, skewedCoords);
+    
+    // translate
+    skewedCoords += int2((-translateXY.x), (-translateXY.y));
+        
+    //scale down/up
+    skewedCoords /= scale;
+    skewedCoords = int2(skewedCoords);
+    
+    // wrap around the screen
+    if (skewedCoords.x >= screenResolution.x || skewedCoords.x < 0)
+    {
+        skewedCoords.x = (int) modulo(skewedCoords.x, screenResolution.x);
+    }
+    if (skewedCoords.y >= screenResolution.y || skewedCoords.y < 0)
+    {
+        skewedCoords.y = (int) modulo(skewedCoords.y, screenResolution.y);
+    }
+
     
     unskewedPostDistortion[skewedCoords] = thisPixelSource;
 }

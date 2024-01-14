@@ -2,6 +2,17 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+public enum AxisNames {
+    X,
+    XY,
+    Y,
+    MinusXY,
+    MinusX,
+    MinusXMinusY,
+    MinusY,
+    XMinusY
+}
+
 [ExecuteInEditMode]
 [RequireComponent(typeof(Camera))]
 public class OutlinesPostPro : MonoBehaviour
@@ -40,8 +51,12 @@ public class OutlinesPostPro : MonoBehaviour
     public RenderTexture outputPreDistortion;
     public RenderTexture outputPostDistortion;
     public Vector2 cameraVelocity;
+    [Range(0, 359.9f)]
     public float skewAngleDegrees;
     public int lengthOfVector;
+    public Vector2Int translateXY;
+    [Range (0, 10)]
+    public float scale;
     private int kernelCombinePasses;
     private int kernelApplyDistortion;
 
@@ -50,6 +65,8 @@ public class OutlinesPostPro : MonoBehaviour
     int kernelUnskewTexture;
     public RenderTexture skewedPreDistortion;
     public RenderTexture unskewedPostDistortion;
+
+    public Hashtable AxisMap;
 
     private void Init()
     {
@@ -88,13 +105,83 @@ public class OutlinesPostPro : MonoBehaviour
         kernelSkewTexture = shader.FindKernel("SkewTexture");
         kernelUnskewTexture = shader.FindKernel("UnskewTexture");
 
+        AxisMap = new Hashtable();
+        AxisMap.Add(AxisNames.X, new Vector2Int(1, 0));                 // 0
+        AxisMap.Add(AxisNames.XY, new Vector2Int(1, 1));                // 1
+        AxisMap.Add(AxisNames.Y, new Vector2Int(0, 1));                 //...
+        AxisMap.Add(AxisNames.MinusXY, new Vector2Int(-1, 1));
+        AxisMap.Add(AxisNames.MinusX, new Vector2Int(-1, 0));
+        AxisMap.Add(AxisNames.MinusXMinusY, new Vector2Int(-1, -1));
+        AxisMap.Add(AxisNames.MinusY, new Vector2Int(0, -1));
+        AxisMap.Add(AxisNames.XMinusY, new Vector2Int(1, -1));          // 7
+
         init = true;
+    }
+
+    public Vector2Int GetAxisFromDegree(int counterClockDeg) // step = 22 * 2 to each side of the axis + center = 45 degree per covering axis
+    {
+        counterClockDeg += 22;
+        if (counterClockDeg >= 180) 
+        {
+            if (counterClockDeg >= 270)
+            {
+                if (counterClockDeg >= 315)
+                {
+                    if (counterClockDeg >= 359)
+                    {
+                        return (Vector2Int)AxisMap[AxisNames.X]; // handle overflow from shift (+ 22)
+                    }
+                    return (Vector2Int)AxisMap[AxisNames.XMinusY];
+                }
+                else
+                {
+                    return (Vector2Int)AxisMap[AxisNames.MinusY];
+                }
+            }
+            else
+            {
+                if (counterClockDeg >= 225)
+                {
+                    return (Vector2Int)AxisMap[AxisNames.MinusXMinusY];
+                }
+                else
+                {
+                    return (Vector2Int)AxisMap[AxisNames.MinusX];
+                }
+            }
+        }
+        else // 0 (-22 exc) to 180 (202 inc)
+        {
+            if (counterClockDeg >= 90)
+            {
+                if (counterClockDeg >= 135)
+                {
+                    return (Vector2Int)AxisMap[AxisNames.MinusXY];
+                }
+                else
+                {
+                    return (Vector2Int)AxisMap[AxisNames.Y];
+                }
+            }
+            else
+            {
+                if (counterClockDeg >= 45)
+                {
+                    return (Vector2Int)AxisMap[AxisNames.XY];
+                }
+                else
+                {
+                    return (Vector2Int)AxisMap[AxisNames.X];
+                }
+            }
+        }
     }
 
     private void CreateTexture(ref RenderTexture textureToMake, int divide = 1)
     {
         textureToMake = new RenderTexture(texSize.x / divide, texSize.y / divide, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
         textureToMake.enableRandomWrite = true;
+        textureToMake.wrapMode = TextureWrapMode.Repeat;
         textureToMake.Create();
     }
     [ExecuteInEditMode]
@@ -131,6 +218,7 @@ public class OutlinesPostPro : MonoBehaviour
 
         CreateTexture(ref unskewedPostDistortion);
         shader.SetTexture(kernelUnskewTexture, "outputPreDistortion", outputPreDistortion);
+        shader.SetTexture(kernelUnskewTexture, "skewedPreDistortion", skewedPreDistortion);
         shader.SetTexture(kernelUnskewTexture, "unskewedPostDistortion", unskewedPostDistortion);
 
         CreateTexture(ref outputPostDistortion);
@@ -155,7 +243,12 @@ public class OutlinesPostPro : MonoBehaviour
         shader.SetFloat("outlineThreshold", outlineThreshold);
         shader.SetFloat("skewAngleRadians", skewAngleDegrees * Mathf.Deg2Rad);
         shader.SetInt("lengthOfVector", lengthOfVector);
+        shader.SetFloat("scale", scale);
+        shader.SetInts("translateXY", translateXY.x, translateXY.y);
         shader.SetFloats("cameraVelocity",  cameraVelocity.x, cameraVelocity.y);
+
+        Vector2Int currentAxis = GetAxisFromDegree((int) skewAngleDegrees);
+        shader.SetInts("blurAlongXY", currentAxis.x, currentAxis.y);
     }
 
     [ExecuteInEditMode]
@@ -175,13 +268,13 @@ public class OutlinesPostPro : MonoBehaviour
         distortionCameraDuplicate.Render();
         distortionMap = distortionCameraDuplicate.activeTexture;
 
-        shader.Dispatch(kernelSkewTexture, groupSize.x, groupSize.y, 1);
+        //shader.Dispatch(kernelSkewTexture, groupSize.x, groupSize.y, 1);
         shader.Dispatch(kernelApplyDistortion, groupSize.x, groupSize.y, 1);
-        shader.Dispatch(kernelUnskewTexture, groupSize.x, groupSize.y, 1);
+        //shader.Dispatch(kernelUnskewTexture, groupSize.x, groupSize.y, 1);
 
-        shader.Dispatch(kernelCombinePasses, groupSize.x, groupSize.y, 1);
+        //shader.Dispatch(kernelCombinePasses, groupSize.x, groupSize.y, 1);
 
-        Graphics.Blit(outputPostDistortion, destination);
+        Graphics.Blit(outputPreDistortion, destination);
     }
 
     [ExecuteInEditMode]
