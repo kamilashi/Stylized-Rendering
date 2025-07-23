@@ -10,8 +10,6 @@ public class CameraMotionDistortion : MonoBehaviour
     public float CustomScaleX = 1.0f;
     public float CustomScaleY = 1.0f;
 
-
-
     void Start()
     {
         CreateBillboard();

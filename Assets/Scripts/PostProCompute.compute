@@ -4,6 +4,7 @@
 #pragma kernel DisortionAlongVelocity
 #pragma kernel UnskewTexture
 #pragma kernel CombineDistortiondMap
+#pragma kernel CombineNoDistortiondMap
 
 Texture2D<float4> source;
 Texture2D<float4> outlineMap;
@@ -242,5 +243,11 @@ void CombineDistortiondMap(uint3 id : SV_DispatchThreadID)
     float4 combined = thisPixelDistortion * thisPixelDistortion.w + (1 - thisPixelDistortion.w) * thisPixelSource;
     combined.w = 1;
     outputPostDistortion[id.xy] = combined;
+}
 
+[numthreads(64, 16, 1)]
+void CombineNoDistortiondMap(uint3 id : SV_DispatchThreadID)
+{
+    float4 thisPixelSource = outputOutline[id.xy];
+    outputPostDistortion[id.xy] = thisPixelSource;
 }
